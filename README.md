@@ -1,62 +1,76 @@
 # SHL Assessment Recommender API
 
-This project is a FastAPI-based AI service that uses Gemini and FAISS to recommend SHL assessments based on a user's conversational input.
+FastAPI service for the SHL conversational assessment recommender take-home. The API is stateless: each `/chat` request sends the full conversation history, and the service returns the next assistant reply plus a structured shortlist when it has enough information.
 
-## Getting Started
+## Endpoints
 
-### 1. Install Dependencies
-Open your terminal (PowerShell or Command Prompt) and navigate to the project directory:
-```bash
+- `GET /health` returns `{"status": "ok"}`.
+- `POST /chat` accepts:
+
+```json
+{
+  "messages": [
+    {"role": "user", "content": "I need tests for a senior Java developer with Spring experience."}
+  ]
+}
+```
+
+Response shape:
+
+```json
+{
+  "reply": "Got it. Here is a catalog-grounded shortlist.",
+  "recommendations": [
+    {"name": "Core Java (Advanced Level) (New)", "url": "https://www.shl.com/products/product-catalog/view/core-java-advanced-level-new/", "test_type": "K"}
+  ],
+  "end_of_conversation": false
+}
+```
+
+## Setup
+
+```powershell
 cd C:\Users\LENOVO\Desktop\Chatbot
 pip install -r requirements.txt
 ```
 
-### 2. Start the API Server
-To run the server locally, run the following command:
-```bash
+Create a `.env` file with:
+
+```text
+GEMINI_API_KEY=your_key_here
+```
+
+## Run Locally
+
+```powershell
 python -m uvicorn main:app --reload
 ```
-You should see output similar to this:
-```text
-[main] Warming up retriever...
-[retriever] Loaded 377 assessments from catalog.json
-[retriever] Ready — 377 assessments indexed with model 'sentence-transformers/all-MiniLM-L6-v2'
-[main] Retriever ready — 377 assessments indexed.
-INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
-```
 
-### 3. Test the API
+Open `http://127.0.0.1:8000/docs` to try the API.
 
-**Using the Interactive Swagger UI (Easiest)**
-1. Open your web browser and go to: **http://127.0.0.1:8000/docs**
-2. Click on the **`POST /chat`** endpoint.
-3. Click **"Try it out"**.
-4. In the Request body, paste this JSON:
-   ```json
-   {
-     "messages": [
-       {
-         "role": "user",
-         "content": "I need tests for a senior Java developer with Spring experience."
-       }
-     ]
-   }
-   ```
-5. Click **"Execute"** and view the response below.
+## Test And Evaluate
 
-**Using PowerShell**
+Syntax check without calling Gemini:
+
 ```powershell
-Invoke-RestMethod -Uri "http://127.0.0.1:8000/chat" -Method Post -Headers @{"Content-Type"="application/json"} -Body '{"messages": [{"role": "user", "content": "I need tests for a senior Java developer with Spring experience."}]}'
+python -m py_compile main.py retriever.py test_agent.py evaluate_traces.py
 ```
 
-### 4. Run the Automated Tests
-To verify everything is working, you can run the test suite:
-```bash
+Behavior tests, which call `/chat` and may consume Gemini quota:
+
+```powershell
 python -m pytest test_agent.py -v -s
 ```
 
-### 5. Evaluate Trace Recall
-To run the evaluation script against the 10 provided conversation traces:
-```bash
+Public trace Recall@10 evaluation, also quota-consuming:
+
+```powershell
 python evaluate_traces.py
 ```
+
+## Notes
+
+- `catalog.json` is the local SHL product catalog used for grounding.
+- `GenAI_SampleConversations_Traces/` contains the 10 public development traces.
+- `retriever.py` builds a FAISS index over sentence-transformer embeddings.
+- `main.py` validates every returned recommendation against `catalog.json` before responding.
